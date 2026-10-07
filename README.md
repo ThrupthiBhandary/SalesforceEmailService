@@ -1,59 +1,304 @@
-# Salesforce DX Project
+# Salesforce Email Service with File Attachments
 
-Salesforce DX is a development approach that brings source-driven development, team collaboration, and continuous integration to the Salesforce Platform. Instead of working directly in an org through a web browser, you work with metadata as source files in a local DX project, track changes in version control, and deploy through automated processes.
+A Salesforce Apex-based email service that sends transactional emails and optionally attaches files stored in **Salesforce Files**. The project demonstrates how to use Salesforce Apex, `Messaging.SingleEmailMessage`, `ContentVersion`, and `Messaging.EmailFileAttachment` to build a reusable email-sending service.
 
-This project template gets you started with the tools and structure you need to build Salesforce applications using source control, scratch orgs, and the Salesforce CLI.
+## Features
 
-## Prerequisites
+* Send simple plain-text emails from Apex
+* Send emails with files attached
+* Retrieve files from Salesforce Files using their title
+* Attach the latest version of a Salesforce File
+* Reusable Apex service class
+* Handles missing files without preventing the email from being sent
+* Uses Salesforce's native email infrastructure
 
-Before you start, make sure you have:
+## Technology Stack
 
-- **Salesforce CLI** - Download from [developer.salesforce.com/tools/salesforcecli](https://developer.salesforce.com/tools/salesforcecli). See [Install Salesforce CLI](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_setup_install_cli.htm) for details.
-- **VS Code with Salesforce Extension Pack** - See [Installation Instructions](https://developer.salesforce.com/docs/platform/sfvscode-extensions/guide/install.html) for details. Includes the Agentforce Vibes extension.
-- **A development org** - Sign up for a free Developer Edition org [here](https://developer.salesforce.com/signup).
-- **Dev Hub enabled** (optional, required to create scratch orgs) - You can enable Dev Hub in your development org under Setup > Dev Hub.  See [Provide Developers Access to Salesforce DX Tools](https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/sfdx_setup_dx_tools.htm).
+* **Salesforce Platform**
+* **Apex**
+* **Salesforce CLI**
+* **VS Code**
+* **Salesforce Extension Pack**
+* **Salesforce Files / ContentVersion**
+* **Git & GitHub**
 
 ## Project Structure
 
-Your DX project follows this structure:
+```text
+SalesforceEmailService/
+├── force-app/
+│   └── main/
+│       └── default/
+│           └── classes/
+│               ├── MyEmailService.cls
+│               └── MyEmailService.cls-meta.xml
+│
+├── config/
+├── manifest/
+├── scripts/
+│   ├── apex/
+│   └── soql/
+│
+├── .gitignore
+├── .forceignore
+├── package.json
+├── sfdx-project.json
+└── README.md
+```
 
-- **`force-app/main/default/`** - Your metadata source files live in this default package directory. You can configure additional package directories in the `sfdx-project.json` file.
-- **`config/`** - Scratch org definitions and project settings
-- **`scripts/`** - Automation scripts for common tasks
-- **`sfdx-project.json`** - Project manifest that defines package directories, namespace, API version, and other project-level settings
+## Apex Service
 
-See [Salesforce DX Project Configuration](https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/sfdx_dev_ws_config.htm).
+The main class is:
 
-## Get Started
+```text
+MyEmailService.cls
+```
 
-Ready to start developing? The [Get Started with Salesforce DX](https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/sfdx_dev_get_started_dx.htm) guide walks you through your first project, from creating a scratch org to creating a simple Apex class or LWC to deploying your code to a sandbox.
+It provides two methods.
 
-## Common Salesforce CLI Commands
+### 1. Simple Email
 
-Here are common CLI commands that you'll use the most:
+`sendSimpleEmail()` sends a plain-text email without an attachment.
 
-- `sf org login web`: Authorize an org
-- `sf org open`: Open your org in a browser
-- `sf org create scratch`: Create a scratch org
-- `sf project deploy start`: Deploy metadata to your org
-- `sf project retrieve start`: Retrieve metadata from your org
-- `sf template generate <artifact>`: Scaffold new components, such as Apex classes and triggers, LWC components, Lightning apps, and more
-- `sf apex <command>`: Run Apex tests, run anonymous Apex blocks, and view logs
-- `sf data <command>`: Work with test data
-- `sf alias <command>`: Manage org aliases
-- `sf config <command>`: Configure CLI settings
+```apex
+MyEmailService.sendSimpleEmail(
+    'recipient@example.com',
+    'Test Email',
+    'This is a test email from Salesforce.'
+);
+```
 
-## Use Agentforce Vibes to Build Lightning Apps
+### 2. Email with File Attachment
 
-Transform your ideas into custom Lightning apps that extend CRM workflows directly in Lightning Experience. Through natural conversations with Agentforce Vibes, implement custom objects and fields, complex business logic, and dynamic UI components. See [Build a Lightning App Using Agentforce Vibes](https://developer.salesforce.com/docs/platform/einstein-for-devs/guide/lexapp-overview.html).
+`sendEmailWithAttachment()` retrieves a file from Salesforce Files using its title and attaches the latest version to the email.
 
-## Additional Resources
+```apex
+MyEmailService.sendEmailWithAttachment(
+    'recipient@example.com',
+    'Project Submission',
+    'Please find the attached document.',
+    'MyResume'
+);
+```
 
-- [Agentforce Vibes Developer Guide](https://developer.salesforce.com/docs/platform/einstein-for-devs/guide/einstein-overview.html)
-- [Salesforce CLI Installation Guide](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_setup_intro.htm)
-- [Salesforce DX Developer Guide](https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/)
-- [Salesforce CLI Command Reference](https://developer.salesforce.com/docs/atlas.en-us.sfdx_cli_reference.meta/sfdx_cli_reference/)
-- [Salesforce CLI Plugin Development Guide](https://developer.salesforce.com/docs/platform/salesforce-cli-plugin/guide/conceptual-overview.html)
-- [Salesforce VS Code Extensions Documentation](https://developer.salesforce.com/tools/vscode/)
+The method uses `ContentVersion` to retrieve the file:
 
-# SalesforceEmailService
+```apex
+SELECT Id, Title, VersionData, PathOnClient
+FROM ContentVersion
+WHERE Title = :fileName
+AND IsLatest = true
+LIMIT 1
+```
+
+The file's binary data is then attached using:
+
+```apex
+Messaging.EmailFileAttachment attachment =
+    new Messaging.EmailFileAttachment();
+
+attachment.setFileName(fileRecord.PathOnClient);
+attachment.setBody(fileRecord.VersionData);
+```
+
+## How It Works
+
+```text
+Salesforce File
+      │
+      ▼
+ContentVersion
+      │
+      │ Find file by Title
+      ▼
+Latest File Version
+      │
+      │ Retrieve VersionData
+      ▼
+EmailFileAttachment
+      │
+      ▼
+Messaging.SingleEmailMessage
+      │
+      ▼
+Recipient Email
+```
+
+## Setup
+
+### Prerequisites
+
+Make sure you have:
+
+* A Salesforce org
+* Salesforce CLI installed
+* Visual Studio Code
+* Salesforce Extension Pack
+* Git
+* GitHub account
+
+### Clone the Repository
+
+```bash
+git clone https://github.com/ThrupthiBhandary/SalesforceEmailService.git
+cd SalesforceEmailService
+```
+
+### Authorize Your Salesforce Org
+
+Authenticate your Salesforce org using Salesforce CLI:
+
+```bash
+sf org login web --alias MySalesforceOrg --instance-url https://login.salesforce.com --set-default
+```
+
+Verify the authorized org:
+
+```bash
+sf org list
+```
+
+## Deploy to Salesforce
+
+To deploy the project to your Salesforce org:
+
+```bash
+sf project deploy start
+```
+
+To deploy only the Apex class:
+
+```bash
+sf project deploy start --metadata ApexClass:MyEmailService
+```
+
+## Retrieve the Apex Class
+
+To retrieve the class from Salesforce into the local project:
+
+```bash
+sf project retrieve start --metadata ApexClass:MyEmailService
+```
+
+## Uploading a File
+
+Before using `sendEmailWithAttachment()`:
+
+1. Open **Salesforce → Files**.
+2. Click **Upload Files**.
+3. Select the required document.
+4. Upload the file.
+5. Check the file's **Title**.
+6. Use that exact title as the `fileName` parameter.
+
+For example, if the Salesforce File title is:
+
+```text
+DhanyashreeGSuvarnaResume
+```
+
+use:
+
+```apex
+String targetFileName = 'DhanyashreeGSuvarnaResume';
+```
+
+The extension does not necessarily need to be included because the Apex query searches the Salesforce **Title** field.
+
+## Example Execution
+
+The method can be tested using Salesforce's **Execute Anonymous** window:
+
+```apex
+String recipient = 'recipient@example.com';
+
+String subject = 'Project Submission with File Attachment';
+
+String body =
+    'Please find the attached document requested for the mailing service project.';
+
+String targetFileName = 'MyResume';
+
+MyEmailService.sendEmailWithAttachment(
+    recipient,
+    subject,
+    body,
+    targetFileName
+);
+```
+
+## Error Handling
+
+If the requested Salesforce File cannot be found, the service catches the `QueryException` and logs a warning:
+
+```text
+No file found with the name: <fileName>
+```
+
+The email can still be sent without the attachment.
+
+For production applications, this behavior can be extended to provide more explicit error handling or return a status to the calling process.
+
+## Email Deliverability
+
+Salesforce email delivery depends on the organization's email configuration.
+
+For testing:
+
+**Setup → Deliverability → Access to Send Email → All Email**
+
+If an email does not appear in the recipient's inbox, check the **Spam/Junk** folder as well as Salesforce email configuration.
+
+## Security Notes
+
+Do not commit personal credentials, passwords, Salesforce access tokens, or sensitive email addresses to GitHub.
+
+For testing code, use placeholders such as:
+
+```apex
+'recipient@example.com'
+```
+
+rather than personal email addresses.
+
+## Git Workflow
+
+After making changes:
+
+```bash
+git status
+git add .
+git commit -m "Update Salesforce email service"
+git push origin main
+```
+
+To retrieve the latest changes from GitHub:
+
+```bash
+git pull origin main
+```
+
+## Future Improvements
+
+Potential enhancements include:
+
+* HTML email support
+* Multiple file attachments
+* File size validation
+* Custom error responses
+* Email templates
+* Salesforce Org-Wide Email Address support
+* Asynchronous email processing
+* Unit tests with `@IsTest`
+* Support for sending files through public links
+* Improved logging and monitoring
+
+## Author
+
+**Thrupthi Bhandary**
+
+Salesforce Apex project demonstrating email automation and Salesforce Files integration.
+
+## License
+
+This project is intended for educational and development purposes.
